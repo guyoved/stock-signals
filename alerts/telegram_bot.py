@@ -3,21 +3,39 @@ Telegram alerting – free via Bot API.
 """
 from __future__ import annotations
 import logging
+import os
 from typing import Dict, List, Optional
 
 import requests
 
-from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-
 logger = logging.getLogger(__name__)
 
 
+def _get_telegram_credentials():
+    """Get token and chat_id from Streamlit secrets or environment."""
+    token = ""
+    chat_id = ""
+
+    # Try Streamlit secrets first
+    try:
+        import streamlit as st
+        token = st.secrets.get("TELEGRAM_BOT_TOKEN", "")
+        chat_id = st.secrets.get("TELEGRAM_CHAT_ID", "")
+    except Exception:
+        pass
+
+    # Fallback to environment variables
+    if not token:
+        token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    if not chat_id:
+        chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+
+    return token, chat_id
+
+
 def send_message(text: str, chat_id: Optional[str] = None, parse_mode: str = "HTML") -> bool:
-    """
-    Send a plain message to the configured Telegram chat.
-    """
-    token = TELEGRAM_BOT_TOKEN
-    chat = chat_id or TELEGRAM_CHAT_ID
+    token, default_chat = _get_telegram_credentials()
+    chat = chat_id or default_chat
 
     if not token or not chat:
         logger.warning("Telegram token or chat_id not set – skipping send")
@@ -43,7 +61,6 @@ def send_message(text: str, chat_id: Optional[str] = None, parse_mode: str = "HT
 
 
 def format_signal(sig: Dict) -> str:
-    """Pretty HTML message for one signal."""
     emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⚪"}.get(sig["signal"], "⚪")
     conf = sig.get("confidence", 0)
     conf_pct = f"{conf:.0%}" if conf <= 1 else f"{conf:.1f}"
@@ -64,14 +81,10 @@ def format_signal(sig: Dict) -> str:
 
 
 def send_signals(signals: List[Dict], header: str = "📊 New Stock Signals") -> int:
-    """
-    Send a batch of signals. Returns number of messages successfully sent.
-    """
     if not signals:
         send_message("No actionable signals at this time.")
         return 0
 
-    # Header
     send_message(f"<b>{header}</b>\n{len(signals)} signal(s) found")
 
     sent = 0
@@ -83,7 +96,6 @@ def send_signals(signals: List[Dict], header: str = "📊 New Stock Signals") ->
 
 
 def send_daily_summary(signals: List[Dict], metrics: Optional[Dict] = None) -> bool:
-    """Optional richer daily summary."""
     buys = [s for s in signals if s["signal"] == "BUY"]
     sells = [s for s in signals if s["signal"] == "SELL"]
 
