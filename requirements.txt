@@ -1,7 +1,6 @@
 yfinance>=0.2.40
 pandas>=2.2.0
 numpy>=1.26.0
-pandas-ta>=0.3.14b
 scikit-learn>=1.4.0
 lightgbm>=4.3.0
 streamlit>=1.32.0
