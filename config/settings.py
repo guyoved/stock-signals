@@ -33,20 +33,28 @@ except Exception:
 
 # Expanded watchlist (~45 liquid US stocks + major ETFs)
 DEFAULT_WATCHLIST = [
-    # Mega tech
+    # Mega / Big Tech
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AVGO", "ORCL", "CRM",
+    "ADBE", "NFLX", "AMD", "INTC", "QCOM", "TXN", "CSCO", "IBM", "NOW", "INTU",
+
     # ETFs
-    "SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK",
+    "SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "XLV", "XLI", "XLP", "XLU", "XLB", "XLRE",
+
     # Finance
-    "JPM", "V", "MA", "BAC", "WFC", "GS",
-    # Healthcare / Consumer
-    "JNJ", "UNH", "LLY", "ABBV", "WMT", "COST", "PG", "KO", "PEP", "HD", "MCD",
+    "JPM", "V", "MA", "BAC", "WFC", "GS", "MS", "C", "AXP", "BLK", "SCHW", "USB",
+
+    # Healthcare
+    "JNJ", "UNH", "LLY", "ABBV", "MRK", "PFE", "TMO", "ABT", "DHR", "BMY", "AMGN", "GILD",
+
+    # Consumer
+    "WMT", "COST", "PG", "KO", "PEP", "HD", "MCD", "NKE", "SBUX", "LOW", "TGT", "DIS",
+    "CMCSA", "T", "VZ", "PM", "MO", "CL", "EL", "MDLZ",
+
     # Energy / Industrial
-    "XOM", "CVX", "BA", "CAT", "GE",
-    # Semiconductors & others
-    "AMD", "INTC", "QCOM", "TXN", "NFLX", "DIS", "CMCSA", "T", "VZ",
-    # Extra liquid names
-    "ADBE", "NKE", "SBUX", "LOW", "UPS"
+    "XOM", "CVX", "COP", "SLB", "EOG", "BA", "CAT", "GE", "HON", "UPS", "RTX", "LMT", "DE",
+
+    # Other strong names
+    "BRK-B", "V", "MA", "ACN", "SPGI", "ISRG", "BKNG", "TJX", "CMCSA"
 ]
 
 # Signal settings
