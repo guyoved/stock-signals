@@ -48,7 +48,7 @@ DEFAULT_WATCHLIST = [
 
     # Consumer
     "WMT", "COST", "PG", "KO", "PEP", "HD", "MCD", "NKE", "SBUX", "LOW", "TGT", "DIS",
-    "CMCSA", "T", "VZ", "PM", "MO", "CL", "EL", "MDLZ",
+    "CMCSA", "T",  "PM", "MO", "CL", "EL", "MDLZ",
 
     # Energy / Industrial
     "XOM", "CVX", "COP", "SLB", "EOG", "BA", "CAT", "GE", "HON", "UPS", "RTX", "LMT", "DE",
