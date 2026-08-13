@@ -41,7 +41,7 @@ DEFAULT_WATCHLIST = [
     # ===== AI / Semiconductor / Growth (Balanced) =====
     "CRDO", "ARM", "SMCI", "DELL", "HPE", "NTAP", "WDC", "STX", "ON", "MPWR",
     "MRVL", "SWKS", "QRVO", "LSCC", "RMBS", "SITM", "ALGM", "DIOD", "FORM", "ACLS",
-    "PLTR", "SNOW", "DDOG", "NET", "CLOUD", "ZS", "OKTA", "ESTC", "MDB", "PATH",
+    "PLTR", "SNOW", "DDOG", "NET", "ZS", "OKTA", "ESTC", "MDB", "PATH",
     "AI", "SOUN", "BBAI", "UPST", "AFRM", "HOOD", "COIN", "MSTR", "RIOT", "MARA",
 
     # ===== ETFs =====
@@ -68,7 +68,7 @@ DEFAULT_WATCHLIST = [
 
     # ===== Other strong / liquid names =====
     "BRK-B", "ACN", "SPGI", "MCO", "ICE", "CME", "MSCI", "NDAQ", "FICO", "ADP",
-    "PAYX", "CTSH", "FIS", "FISV", "GPN", "SQ", "PYPL", "SHOP", "MELI", "SE",
+    "PAYX", "CTSH", "FIS", "FISV", "GPN", "PYPL", "SHOP", "MELI", "SE",
     "JD", "PDD", "BABA", "NIO", "XPEV", "LI", "BIDU", "TSM", "ASML", "SAP"
 ]
 
