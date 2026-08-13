@@ -33,28 +33,43 @@ except Exception:
 
 # Expanded watchlist (~45 liquid US stocks + major ETFs)
 DEFAULT_WATCHLIST = [
-    # Mega / Big Tech
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AVGO", "ORCL", "CRM",
-    "ADBE", "NFLX", "AMD", "INTC", "QCOM", "TXN", "CSCO", "IBM", "NOW", "INTU",
+    # ===== Mega / Big Tech =====
+    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "AVGO", "ORCL",
+    "CRM", "ADBE", "NFLX", "AMD", "INTC", "QCOM", "TXN", "CSCO", "IBM", "NOW",
+    "INTU", "AMAT", "LRCX", "KLAC", "MU", "SNPS", "CDNS", "ANET", "PANW", "CRWD",
 
-    # ETFs
-    "SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "XLV", "XLI", "XLP", "XLU", "XLB", "XLRE",
+    # ===== AI / Semiconductor / Growth (Balanced) =====
+    "CRDO", "ARM", "SMCI", "DELL", "HPE", "NTAP", "WDC", "STX", "ON", "MPWR",
+    "MRVL", "SWKS", "QRVO", "LSCC", "RMBS", "SITM", "ALGM", "DIOD", "FORM", "ACLS",
+    "PLTR", "SNOW", "DDOG", "NET", "CLOUD", "ZS", "OKTA", "ESTC", "MDB", "PATH",
+    "AI", "SOUN", "BBAI", "UPST", "AFRM", "HOOD", "COIN", "MSTR", "RIOT", "MARA",
 
-    # Finance
-    "JPM", "V", "MA", "BAC", "WFC", "GS", "MS", "C", "AXP", "BLK", "SCHW", "USB",
+    # ===== ETFs =====
+    "SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "XLV", "XLI", "XLP",
+    "XLU", "XLB", "XLRE", "SMH", "SOXX", "BOTZ", "ARKK", "ARKW", "ARKF", "VGT",
 
-    # Healthcare
-    "JNJ", "UNH", "LLY", "ABBV", "MRK", "PFE", "TMO", "ABT", "DHR", "BMY", "AMGN", "GILD",
+    # ===== Finance =====
+    "JPM", "V", "MA", "BAC", "WFC", "GS", "MS", "C", "AXP", "BLK",
+    "SCHW", "USB", "PNC", "TFC", "COF", "AIG", "MET", "PRU", "TRV", "ALL",
 
-    # Consumer
-    "WMT", "COST", "PG", "KO", "PEP", "HD", "MCD", "NKE", "SBUX", "LOW", "TGT", "DIS",
-    "CMCSA", "T",  "PM", "MO", "CL", "EL", "MDLZ",
+    # ===== Healthcare / Biotech =====
+    "JNJ", "UNH", "LLY", "ABBV", "MRK", "PFE", "TMO", "ABT", "DHR", "BMY",
+    "AMGN", "GILD", "REGN", "VRTX", "ISRG", "SYK", "BSX", "MDT", "ZTS", "CI",
 
-    # Energy / Industrial
-    "XOM", "CVX", "COP", "SLB", "EOG", "BA", "CAT", "GE", "HON", "UPS", "RTX", "LMT", "DE",
+    # ===== Consumer / Retail =====
+    "WMT", "COST", "PG", "KO", "PEP", "HD", "MCD", "NKE", "SBUX", "LOW",
+    "TGT", "DIS", "CMCSA", "T", "VZ", "PM", "MO", "CL", "EL", "MDLZ",
+    "BKNG", "MAR", "HLT", "YUM", "CMG", "DPZ", "ROST", "TJX", "BBY", "ULTA",
 
-    # Other strong names
-    "BRK-B", "V", "MA", "ACN", "SPGI", "ISRG", "BKNG", "TJX", "CMCSA"
+    # ===== Energy / Industrial =====
+    "XOM", "CVX", "COP", "SLB", "EOG", "OXY", "MPC", "VLO", "PSX", "HAL",
+    "BA", "CAT", "GE", "HON", "UPS", "RTX", "LMT", "DE", "UNP", "CSX",
+    "NSC", "FDX", "WM", "RSG", "ETN", "EMR", "ITW", "PH", "ROK", "DOV",
+
+    # ===== Other strong / liquid names =====
+    "BRK-B", "ACN", "SPGI", "MCO", "ICE", "CME", "MSCI", "NDAQ", "FICO", "ADP",
+    "PAYX", "CTSH", "FIS", "FISV", "GPN", "SQ", "PYPL", "SHOP", "MELI", "SE",
+    "JD", "PDD", "BABA", "NIO", "XPEV", "LI", "BIDU", "TSM", "ASML", "SAP"
 ]
 
 # Signal settings
