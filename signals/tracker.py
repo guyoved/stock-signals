@@ -1,5 +1,5 @@
 """
-Success / Failure tracking – file-based (CSV) so it persists on GitHub.
+Permanent signal tracking using CSV (works with GitHub + Streamlit).
 """
 from __future__ import annotations
 import logging
@@ -17,44 +17,39 @@ logger = logging.getLogger(__name__)
 HISTORY_FILE = BASE_DIR / "data" / "signals_history.csv"
 
 
-def _ensure_file() -> None:
-    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+def init_db() -> None:
+    """Create the CSV file if it does not exist."""
+    HISTORY_FILE.parent.mkdir(exist_ok=True)
     if not HISTORY_FILE.exists():
-        cols = [
+        df = pd.DataFrame(columns=[
             "id", "timestamp", "ticker", "signal", "confidence", "entry_price",
             "horizon_days", "reason", "status", "exit_price", "exit_date",
             "return_pct", "success", "evaluated_at"
-        ]
-        pd.DataFrame(columns=cols).to_csv(HISTORY_FILE, index=False)
+        ])
+        df.to_csv(HISTORY_FILE, index=False)
+    logger.info(f"Tracking file ready at {HISTORY_FILE}")
 
 
-def _load() -> pd.DataFrame:
-    _ensure_file()
+def _load_history() -> pd.DataFrame:
+    init_db()
     try:
         df = pd.read_csv(HISTORY_FILE)
-        if df.empty:
-            return df
         return df
     except Exception:
         return pd.DataFrame()
 
 
-def _save(df: pd.DataFrame) -> None:
-    _ensure_file()
+def _save_history(df: pd.DataFrame) -> None:
     df.to_csv(HISTORY_FILE, index=False)
 
 
-def init_db() -> None:
-    """Kept for compatibility. Just ensures the CSV exists."""
-    _ensure_file()
-    logger.info(f"Tracking file ready at {HISTORY_FILE}")
-
-
 def log_signal(sig: Dict[str, Any], horizon_days: int = SIGNAL_HORIZON_DAYS) -> int:
-    df = _load()
-    new_id = int(df["id"].max()) + 1 if not df.empty and "id" in df.columns else 1
+    init_db()
+    df = _load_history()
 
-    row = {
+    new_id = 1 if df.empty else int(df["id"].max()) + 1
+
+    new_row = {
         "id": new_id,
         "timestamp": sig.get("timestamp") or datetime.utcnow().isoformat(),
         "ticker": sig["ticker"],
@@ -70,8 +65,9 @@ def log_signal(sig: Dict[str, Any], horizon_days: int = SIGNAL_HORIZON_DAYS) -> 
         "success": None,
         "evaluated_at": None,
     }
-    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-    _save(df)
+
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    _save_history(df)
     return new_id
 
 
@@ -86,7 +82,7 @@ def log_signals(signals: List[Dict[str, Any]], horizon_days: int = SIGNAL_HORIZO
 
 def _get_price_on_or_after(ticker: str, date_str: str) -> Optional[float]:
     try:
-        start = datetime.fromisoformat(str(date_str)[:10])
+        start = datetime.fromisoformat(date_str[:10])
         end = start + timedelta(days=12)
         df = yf.download(
             ticker,
@@ -106,26 +102,24 @@ def _get_price_on_or_after(ticker: str, date_str: str) -> Optional[float]:
 
 
 def evaluate_open_signals(horizon_days: int = SIGNAL_HORIZON_DAYS) -> int:
-    df = _load()
+    init_db()
+    df = _load_history()
     if df.empty:
         return 0
 
     now = datetime.utcnow()
     evaluated = 0
 
-    for idx, row in df.iterrows():
-        if row.get("status") != "open":
-            continue
+    for idx, row in df[df["status"] == "open"].iterrows():
         try:
             entry_time = datetime.fromisoformat(str(row["timestamp"])[:19])
             days_passed = (now - entry_time).days
-            needed = int(row.get("horizon_days") or horizon_days)
 
-            if days_passed < needed:
+            if days_passed < int(row["horizon_days"]):
                 continue
 
-            exit_price = _get_price_on_or_after(row["ticker"], row["timestamp"])
-            if exit_price is None or pd.isna(row.get("entry_price")):
+            exit_price = _get_price_on_or_after(row["ticker"], str(row["timestamp"]))
+            if exit_price is None or pd.isna(row["entry_price"]):
                 continue
 
             entry = float(row["entry_price"])
@@ -137,7 +131,7 @@ def evaluate_open_signals(horizon_days: int = SIGNAL_HORIZON_DAYS) -> int:
             success = 1 if ret > 0 else 0
 
             df.at[idx, "status"] = "closed"
-            df.at[idx, "exit_price"] = round(exit_price, 4)
+            df.at[idx, "exit_price"] = round(exit_price, 2)
             df.at[idx, "exit_date"] = now.isoformat()
             df.at[idx, "return_pct"] = round(ret * 100, 3)
             df.at[idx, "success"] = success
@@ -147,13 +141,14 @@ def evaluate_open_signals(horizon_days: int = SIGNAL_HORIZON_DAYS) -> int:
             logger.error(f"Error evaluating signal {row.get('id')}: {e}")
 
     if evaluated > 0:
-        _save(df)
+        _save_history(df)
+
     logger.info(f"Evaluated {evaluated} signals")
     return evaluated
 
 
 def get_performance_stats() -> Dict[str, Any]:
-    df = _load()
+    df = _load_history()
     closed = df[df["status"] == "closed"] if not df.empty else pd.DataFrame()
 
     if closed.empty:
@@ -182,7 +177,7 @@ def get_performance_stats() -> Dict[str, Any]:
 
 
 def get_recent_signals(limit: int = 50) -> pd.DataFrame:
-    df = _load()
+    df = _load_history()
     if df.empty:
         return df
     return df.sort_values("timestamp", ascending=False).head(limit)
