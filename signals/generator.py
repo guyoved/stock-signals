@@ -107,7 +107,7 @@ def generate_signal_for_ticker(
 
     if REQUIRE_VOLUME_CONFIRM and signal in ("BUY", "SELL"):
         vol_ratio = latest.get("Volume_Ratio", 1.0)
-        if vol_ratio < 1.0:
+        if vol_ratio < 0.85:
             signal = "HOLD"
             filters_failed.append(f"Low volume ({vol_ratio:.2f}x)")
         else:
