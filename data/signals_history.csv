@@ -1,1 +1,2 @@
-﻿id,timestamp,ticker,signal,confidence,entry_price,horizon_days,reason,status,exit_price,exit_date,return_pct,success,evaluated_at
+id,timestamp,ticker,signal,confidence,entry_price,horizon_days,reason,status,exit_price,exit_date,return_pct,success,evaluated_at
+1,2026-08-21T14:29:34.281138,MSTR,BUY,0.5812,119.61,5,"Model probability 58.1% | SPY regime OK (bull), Volume OK (1.01x), Trend filter OK",open,,,,,
