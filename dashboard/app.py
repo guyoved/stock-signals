@@ -16,7 +16,7 @@ from datetime import datetime
 from config.settings import DEFAULT_WATCHLIST, DASHBOARD_TITLE, MIN_CONFIDENCE, SIGNAL_HORIZON_DAYS
 from data.fetcher import fetch_ohlcv
 from signals.generator import generate_signals, generate_signal_for_ticker, train_on_watchlist
-from signals.tracker import get_performance_stats, get_recent_signals, evaluate_open_signals, init_db
+from signals.tracker import get_performance_stats, get_recent_signals, evaluate_open_signals, log_signals, init_db
 from models.trainer import load_model
 from alerts.telegram_bot import send_signals
 
@@ -36,7 +36,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📈 Stock Signals")
-st.caption(f"Horizon: {SIGNAL_HORIZON_DAYS} trading days · Layer 1 filters · Tracking enabled")
+st.caption(f"Horizon: {SIGNAL_HORIZON_DAYS} trading days · Permanent tracking (Supabase)")
 
 # Sidebar
 with st.sidebar:
@@ -94,6 +94,12 @@ with tab1:
                 )
                 for s in signals:
                     s["horizon_days"] = SIGNAL_HORIZON_DAYS
+
+                # Save to Supabase
+                if signals:
+                    n = log_signals(signals)
+                    st.success(f"Saved {n} signals to database")
+
                 st.session_state["last_signals"] = signals
                 st.session_state["run_signals"] = False
             except Exception as e:
@@ -134,8 +140,7 @@ with tab2:
     stats = get_performance_stats()
 
     if stats["n_closed"] == 0:
-        st.info("No closed signals yet. They are evaluated after 5 trading days.")
-        st.write("Click **Evaluate Open Signals** in the sidebar after a few days.")
+        st.info("No closed signals yet. They are evaluated after 4–5 days.")
     else:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Closed", stats["n_closed"])
@@ -147,10 +152,8 @@ with tab2:
     st.subheader("Recent signals log")
     recent = get_recent_signals(40)
     if not recent.empty:
-        st.dataframe(
-            recent[["timestamp", "ticker", "signal", "confidence", "entry_price", "horizon_days", "status", "return_pct", "success"]],
-            use_container_width=True
-        )
+        cols = [c for c in ["timestamp", "ticker", "signal", "confidence", "entry_price", "horizon_days", "status", "return_pct", "success"] if c in recent.columns]
+        st.dataframe(recent[cols], use_container_width=True)
     else:
         st.caption("No signals logged yet.")
 
@@ -170,9 +173,8 @@ with tab4:
     st.markdown(f"""
     ### Current Setup
     - **Horizon**: {SIGNAL_HORIZON_DAYS} trading days
-    - **Filters**: SPY regime + Volume + Trend + Top 5 signals
-    - **Tracking**: Every signal is saved and later evaluated
-    - **Watchlist**: ~45 liquid stocks + ETFs
+    - **Tracking**: Permanent (Supabase)
+    - **Filters**: SPY regime + Volume + Trend + Top signals
     """)
 
 st.caption(f"Updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC")
