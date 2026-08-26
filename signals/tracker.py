@@ -45,12 +45,29 @@ def init_db() -> None:
 
 
 def log_signal(sig: Dict[str, Any], horizon_days: int = 5) -> None:
-    """Insert a new signal into Supabase."""
+    """Insert a new signal into Supabase (skip if recent open signal exists)."""
     try:
         sb = _get_supabase()
+        ticker = sig["ticker"]
+
+        # Check for recent open signal of the same ticker (last 24 hours)
+        since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        existing = (
+            sb.table("signals")
+            .select("id")
+            .eq("ticker", ticker)
+            .eq("status", "open")
+            .gte("timestamp", since)
+            .execute()
+        )
+
+        if existing.data:
+            logger.info(f"Skip duplicate: {ticker} already has an open signal in the last 24h")
+            return
+
         row = {
             "timestamp": sig.get("timestamp") or datetime.utcnow().isoformat(),
-            "ticker": sig["ticker"],
+            "ticker": ticker,
             "signal": sig["signal"],
             "confidence": sig.get("confidence"),
             "entry_price": sig.get("price"),
@@ -59,7 +76,7 @@ def log_signal(sig: Dict[str, Any], horizon_days: int = 5) -> None:
             "status": "open",
         }
         sb.table("signals").insert(row).execute()
-        logger.info(f"Logged signal: {sig['ticker']} {sig['signal']}")
+        logger.info(f"Logged signal: {ticker} {sig['signal']}")
     except Exception as e:
         logger.error(f"Failed to log signal: {e}")
 
