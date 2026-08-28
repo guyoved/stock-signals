@@ -77,17 +77,31 @@ def main():
             send_signals([])
         return
 
-    n_logged = log_signals(signals, horizon_days=SIGNAL_HORIZON_DAYS)
-    logger.info(f"Logged {n_logged} signals for future tracking")
+    saved_signals = []
+    for s in signals:
+        if s.get("signal") in ("BUY", "SELL"):
+            saved_signals.append(s)
+
+    persisted = []
+    for s in saved_signals:
+        if s.get("signal") in ("BUY", "SELL"):
+            try:
+                from signals.tracker import log_signal
+                if log_signal(s, horizon_days=SIGNAL_HORIZON_DAYS):
+                    persisted.append(s)
+            except Exception as exc:
+                logger.warning(f"Failed to persist signal for {s.get('ticker')}: {exc}")
+
+    logger.info(f"Logged {len(persisted)} signals for future tracking")
 
     logger.info(f"Found {len(signals)} signals:")
     for s in signals:
         logger.info(f"  {s['signal']:4} {s['ticker']:5} conf={s['confidence']:.2f} price={s['price']} | horizon={SIGNAL_HORIZON_DAYS}d")
 
     if args.send:
-        n = send_signals(signals)
+        n = send_signals(persisted)
         logger.info(f"Telegram: {n} messages sent")
-        send_daily_summary(signals)
+        send_daily_summary(persisted)
 
 
 if __name__ == "__main__":

@@ -44,50 +44,89 @@ def init_db() -> None:
     logger.info("Using Supabase for permanent tracking")
 
 
-def log_signal(sig: Dict[str, Any], horizon_days: int = 5) -> None:
-    """Insert a new signal into Supabase (skip if recent open signal exists)."""
+def _looks_like_duplicate_insert_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(token in msg for token in [
+        "duplicate key",
+        "unique constraint",
+        "already exists",
+        "23505",
+        "duplicate",
+    ])
+
+
+def _compute_dedupe_key(ticker: str, signal: str, timestamp_value: Any) -> str:
+    ts = timestamp_value or datetime.utcnow().isoformat()
+    try:
+        dt = datetime.fromisoformat(str(ts)[:19])
+    except Exception:
+        dt = datetime.utcnow()
+    return f"{ticker}|{signal}|open|{dt.strftime('%Y-%m-%d')}"
+
+
+def log_signal(sig: Dict[str, Any], horizon_days: int = 5) -> bool:
+    """Insert a new signal into Supabase and return whether it was actually saved."""
     try:
         sb = _get_supabase()
         ticker = sig["ticker"]
+        signal = sig["signal"]
+        ts = sig.get("timestamp") or datetime.utcnow().isoformat()
 
-        # Check for recent open signal of the same ticker (last 24 hours)
+        # Check for recent open signal of the same ticker + signal in the last 24h.
         since = (datetime.utcnow() - timedelta(hours=24)).isoformat()
         existing = (
             sb.table("signals")
             .select("id")
             .eq("ticker", ticker)
+            .eq("signal", signal)
             .eq("status", "open")
             .gte("timestamp", since)
             .execute()
         )
 
         if existing.data:
-            logger.info(f"Skip duplicate: {ticker} already has an open signal in the last 24h")
-            return
+            logger.info(f"Skip duplicate: {ticker} {signal} already has an open signal in the last 24h")
+            return False
 
         row = {
-            "timestamp": sig.get("timestamp") or datetime.utcnow().isoformat(),
+            "timestamp": ts,
             "ticker": ticker,
-            "signal": sig["signal"],
+            "signal": signal,
             "confidence": sig.get("confidence"),
             "entry_price": sig.get("price"),
             "horizon_days": horizon_days,
             "reason": sig.get("reason"),
             "status": "open",
+            "dedupe_key": _compute_dedupe_key(ticker, signal, ts),
         }
-        sb.table("signals").insert(row).execute()
-        logger.info(f"Logged signal: {ticker} {sig['signal']}")
+
+        try:
+            sb.table("signals").insert(row).execute()
+            logger.info(f"Logged signal: {ticker} {signal}")
+            return True
+        except Exception as insert_exc:
+            if _looks_like_duplicate_insert_error(insert_exc):
+                logger.info(f"Duplicate insert ignored: {ticker} {signal} already exists in database")
+                return False
+            raise
+
     except Exception as e:
         logger.error(f"Failed to log signal: {e}")
+        return False
+
+
+def persist_signals(signals: List[Dict[str, Any]], horizon_days: int = 5) -> List[Dict[str, Any]]:
+    """Persist BUY/SELL signals and return only the ones that were saved."""
+    saved: List[Dict[str, Any]] = []
+    for s in signals:
+        if s.get("signal") in ("BUY", "SELL") and log_signal(s, horizon_days=horizon_days):
+            saved.append(s)
+    return saved
 
 
 def log_signals(signals: List[Dict[str, Any]], horizon_days: int = 5) -> int:
-    count = 0
-    for s in signals:
-        if s.get("signal") in ("BUY", "SELL"):
-            log_signal(s, horizon_days=horizon_days)
-            count += 1
-    return count
+    """Backward-compatible count-based wrapper."""
+    return len(persist_signals(signals, horizon_days=horizon_days))
 
 
 def _get_price_on_or_after(ticker: str, date_str: str) -> Optional[float]:
