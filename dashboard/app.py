@@ -11,7 +11,8 @@ sys.path.insert(0, str(ROOT))
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from config.settings import DEFAULT_WATCHLIST, DASHBOARD_TITLE, MIN_CONFIDENCE, SIGNAL_HORIZON_DAYS
 from data.fetcher import fetch_ohlcv
@@ -177,4 +178,5 @@ with tab4:
     - **Filters**: SPY regime + Volume + Trend + Top signals
     """)
 
-st.caption(f"Updated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC")
+israel_now = datetime.now(ZoneInfo("Asia/Jerusalem"))
+st.caption(f"Updated: {israel_now.strftime('%Y-%m-%d %H:%M')} IST")

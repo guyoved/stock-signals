@@ -4,9 +4,26 @@ Telegram alerting – free via Bot API.
 from __future__ import annotations
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import requests
+
+ISRAEL_TZ = timezone.utc
+
+
+def format_israel_time(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    try:
+        dt = datetime.fromisoformat(value[:19])
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        israel_dt = dt.astimezone(timezone.utc)
+        israel_dt = israel_dt.astimezone(__import__('zoneinfo').ZoneInfo('Asia/Jerusalem'))
+        return israel_dt.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return value[:19] if len(value) >= 19 else value
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +92,7 @@ def format_signal(sig: Dict) -> str:
         f"Horizon: <b>{horizon} trading days</b>",
         f"Suggested size: <b>{pos_str}</b> of portfolio",
         f"Reason: {sig.get('reason', '')}",
-        f"<i>{sig.get('timestamp', '')[:19]} UTC</i>",
+        f"<i>{format_israel_time(sig.get('timestamp'))} IST</i>",
     ]
     return "\n".join(lines)
 
