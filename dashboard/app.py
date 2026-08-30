@@ -15,6 +15,19 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from config.settings import DEFAULT_WATCHLIST, DASHBOARD_TITLE, MIN_CONFIDENCE, SIGNAL_HORIZON_DAYS
+
+
+def format_israel_time(value):
+    if pd.isna(value):
+        return value
+    try:
+        dt = datetime.fromisoformat(str(value)[:19])
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        israel_dt = dt.astimezone(ZoneInfo("Asia/Jerusalem"))
+        return israel_dt.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return str(value)[:19] if isinstance(value, str) else value
 from data.fetcher import fetch_ohlcv
 from signals.generator import generate_signals, generate_signal_for_ticker, train_on_watchlist
 from signals.tracker import get_performance_stats, get_recent_signals, evaluate_open_signals, log_signals, init_db
@@ -153,8 +166,13 @@ with tab2:
     st.subheader("Recent signals log")
     recent = get_recent_signals(40)
     if not recent.empty:
-        cols = [c for c in ["timestamp", "ticker", "signal", "confidence", "entry_price", "horizon_days", "status", "return_pct", "success"] if c in recent.columns]
-        st.dataframe(recent[cols], use_container_width=True)
+        recent_display = recent.copy()
+        if "timestamp" in recent_display.columns:
+            recent_display["timestamp"] = recent_display["timestamp"].map(
+                lambda x: format_israel_time(str(x)) if pd.notna(x) else x
+            )
+        cols = [c for c in ["timestamp", "ticker", "signal", "confidence", "entry_price", "horizon_days", "status", "return_pct", "success"] if c in recent_display.columns]
+        st.dataframe(recent_display[cols], use_container_width=True)
     else:
         st.caption("No signals logged yet.")
 

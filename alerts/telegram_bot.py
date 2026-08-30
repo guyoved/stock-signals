@@ -8,8 +8,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import requests
-
-ISRAEL_TZ = timezone.utc
+from zoneinfo import ZoneInfo
 
 
 def format_israel_time(value: Optional[str]) -> str:
@@ -19,8 +18,7 @@ def format_israel_time(value: Optional[str]) -> str:
         dt = datetime.fromisoformat(value[:19])
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        israel_dt = dt.astimezone(timezone.utc)
-        israel_dt = israel_dt.astimezone(__import__('zoneinfo').ZoneInfo('Asia/Jerusalem'))
+        israel_dt = dt.astimezone(ZoneInfo("Asia/Jerusalem"))
         return israel_dt.strftime("%Y-%m-%d %H:%M")
     except Exception:
         return value[:19] if len(value) >= 19 else value
