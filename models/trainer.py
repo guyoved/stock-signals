@@ -69,6 +69,48 @@ def train_lightgbm(
     return model, metrics
 
 
+def train_lightgbm_from_prepared(
+    X: pd.DataFrame,
+    y: pd.Series,
+    test_size: float = 0.2,
+    random_state: int = 42,
+) -> tuple[lgb.LGBMClassifier, dict[str, Any]]:
+    """Train on per-ticker features without crossing ticker boundaries."""
+    if len(X) < 100:
+        raise ValueError(f"Not enough samples after feature engineering: {len(X)}")
+
+    split = int(len(X) * (1 - test_size))
+    X_train, X_test = X.iloc[:split], X.iloc[split:]
+    y_train, y_test = y.iloc[:split], y.iloc[split:]
+
+    model = lgb.LGBMClassifier(
+        n_estimators=200,
+        learning_rate=0.05,
+        max_depth=6,
+        num_leaves=31,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        random_state=random_state,
+        verbosity=-1,
+        n_jobs=-1,
+    )
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+    metrics = {
+        "accuracy": float(accuracy_score(y_test, y_pred)),
+        "roc_auc": float(roc_auc_score(y_test, y_proba)) if len(np.unique(y_test)) > 1 else 0.0,
+        "n_train": len(X_train),
+        "n_test": len(X_test),
+        "feature_importance": dict(zip(X.columns, model.feature_importances_.tolist())),
+        "trained_at": datetime.utcnow().isoformat(),
+        "target_horizon_days": 5,
+    }
+    logger.info(f"Model trained – Accuracy: {metrics['accuracy']:.3f}, AUC: {metrics['roc_auc']:.3f}")
+    return model, metrics
+
+
 def save_model(model: lgb.LGBMClassifier, metrics: dict, name: str = MODEL_NAME) -> Path:
     path = MODELS_DIR / f"{name}.joblib"
     joblib.dump({"model": model, "metrics": metrics, "features": list(model.feature_name_)}, path)

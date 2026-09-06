@@ -12,7 +12,7 @@ import ta
 logger = logging.getLogger(__name__)
 
 
-def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
+def add_technical_features(df: pd.DataFrame, target_horizon: int = 5) -> pd.DataFrame:
     if df.empty or len(df) < 50:
         logger.warning("Not enough data for features")
         return df
@@ -78,8 +78,8 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
     df["Return_5d"] = close.pct_change(5)
     df["Volatility_20"] = df["Return_1d"].rolling(20).std()
 
-    # Target
-    df["Target"] = (close.shift(-1) > close).astype(float)
+    # Target matches the signal evaluation holding period.
+    df["Target"] = (close.shift(-target_horizon) > close).astype(float)
 
     df = df.replace([np.inf, -np.inf], np.nan)
     return df

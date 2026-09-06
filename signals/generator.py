@@ -18,8 +18,14 @@ from config.settings import (
     REQUIRE_TREND_FILTER,
 )
 from data.fetcher import fetch_ohlcv, get_latest_price
-from features.engineering import add_technical_features
-from models.trainer import load_model, predict_proba, get_signal_from_proba, train_lightgbm, save_model
+from features.engineering import add_technical_features, prepare_ml_dataset
+from models.trainer import (
+    load_model,
+    predict_proba,
+    get_signal_from_proba,
+    train_lightgbm_from_prepared,
+    save_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,17 +191,23 @@ def generate_signals(
 
 def train_on_watchlist(tickers: Optional[List[str]] = None) -> dict:
     tickers = tickers or DEFAULT_WATCHLIST
-    frames = []
+    feature_frames = []
+    target_frames = []
     for t in tickers:
         df = fetch_ohlcv(t, period="3y")
         if not df.empty and len(df) > 100:
             df = df.reset_index(drop=True)
-            frames.append(df[["Open", "High", "Low", "Close", "Volume"]])
+            df_feat = add_technical_features(df[["Open", "High", "Low", "Close", "Volume"]])
+            X, y = prepare_ml_dataset(df_feat)
+            if not X.empty:
+                feature_frames.append(X)
+                target_frames.append(y)
 
-    if not frames:
+    if not feature_frames:
         raise ValueError("No data fetched for training")
 
-    combined = pd.concat(frames, ignore_index=True)
-    model, metrics = train_lightgbm(combined)
+    X = pd.concat(feature_frames, ignore_index=True)
+    y = pd.concat(target_frames, ignore_index=True)
+    model, metrics = train_lightgbm_from_prepared(X, y)
     save_model(model, metrics)
     return metrics

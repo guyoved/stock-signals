@@ -129,13 +129,14 @@ def log_signals(signals: List[Dict[str, Any]], horizon_days: int = 5) -> int:
     return len(persist_signals(signals, horizon_days=horizon_days))
 
 
-def _get_price_on_or_after(ticker: str, date_str: str) -> Optional[float]:
+def _get_price_on_or_after(ticker: str, date_str: str, holding_days: int = 5) -> Optional[float]:
     try:
         start = datetime.fromisoformat(date_str[:10])
-        end = start + timedelta(days=12)
+        target_date = start + timedelta(days=holding_days)
+        end = target_date + timedelta(days=5)
         df = yf.download(
             ticker,
-            start=start.strftime("%Y-%m-%d"),
+            start=target_date.strftime("%Y-%m-%d"),
             end=end.strftime("%Y-%m-%d"),
             progress=False,
             auto_adjust=True,
@@ -144,7 +145,7 @@ def _get_price_on_or_after(ticker: str, date_str: str) -> Optional[float]:
             return None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        return float(df["Close"].iloc[-1])
+        return float(df["Close"].iloc[0])
     except Exception as e:
         logger.warning(f"Could not fetch exit price for {ticker}: {e}")
         return None
@@ -170,7 +171,9 @@ def evaluate_open_signals(min_days: int = 4) -> int:
                 if days_passed < min_days:
                     continue
 
-                exit_price = _get_price_on_or_after(row["ticker"], row["timestamp"])
+                exit_price = _get_price_on_or_after(
+                    row["ticker"], row["timestamp"], holding_days=int(row.get("horizon_days") or 5)
+                )
                 if exit_price is None or row.get("entry_price") is None:
                     logger.warning(f"No exit price for {row['ticker']}")
                     continue
