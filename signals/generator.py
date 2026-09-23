@@ -16,6 +16,9 @@ from config.settings import (
     REQUIRE_SPY_TREND,
     REQUIRE_VOLUME_CONFIRM,
     REQUIRE_TREND_FILTER,
+    VOLUME_CONFIRM_RATIO,
+    TREND_CONFIRM_MARGIN,
+    MAX_POSITION_PCT,
 )
 from data.fetcher import fetch_ohlcv, get_latest_price
 from features.engineering import add_technical_features, prepare_ml_dataset
@@ -28,6 +31,94 @@ from models.trainer import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_signal_threshold(min_confidence: float) -> float:
+    """Ensure the strategy only trades with materially stronger probabilities."""
+    return max(float(min_confidence), MIN_CONFIDENCE)
+
+
+def _apply_quality_filters(
+    signal: str,
+    proba: float,
+    latest: pd.Series,
+    spy_regime: str,
+    min_confidence: float,
+) -> tuple[str, str, list[str], list[str]]:
+    """Return a cleaned signal and the reasons for acceptance or rejection."""
+    filters_passed: list[str] = []
+    filters_failed: list[str] = []
+    signal_threshold = _normalize_signal_threshold(min_confidence)
+
+    if signal in ("BUY", "SELL") and proba is not None:
+        if signal == "BUY" and proba < signal_threshold:
+            signal = "HOLD"
+            filters_failed.append(f"Model below threshold ({proba:.1%} < {signal_threshold:.1%})")
+        elif signal == "SELL" and proba > (1 - signal_threshold):
+            signal = "HOLD"
+            filters_failed.append(f"Model below sell threshold ({proba:.1%} > {(1 - signal_threshold):.1%})")
+
+    if REQUIRE_SPY_TREND and signal in ("BUY", "SELL"):
+        if signal == "BUY" and spy_regime == "bear":
+            signal = "HOLD"
+            filters_failed.append("SPY in downtrend")
+        elif signal == "SELL" and spy_regime == "bull":
+            signal = "HOLD"
+            filters_failed.append("SPY in uptrend")
+        else:
+            filters_passed.append(f"SPY regime OK ({spy_regime})")
+
+    if REQUIRE_VOLUME_CONFIRM and signal in ("BUY", "SELL"):
+        vol_ratio = float(latest.get("Volume_Ratio", 1.0))
+        if vol_ratio < VOLUME_CONFIRM_RATIO:
+            signal = "HOLD"
+            filters_failed.append(f"Low volume ({vol_ratio:.2f}x < {VOLUME_CONFIRM_RATIO:.2f}x)")
+        else:
+            filters_passed.append(f"Volume OK ({vol_ratio:.2f}x)")
+
+    if REQUIRE_TREND_FILTER and signal in ("BUY", "SELL"):
+        close_vs_sma20 = float(latest.get("Close_vs_SMA20", 0.0))
+        close_vs_sma50 = float(latest.get("Close_vs_SMA50", 0.0))
+        sma20_vs_sma50 = float(latest.get("SMA20_vs_SMA50", 0.0))
+        rsi = float(latest.get("RSI_14", 50.0))
+        roc_10 = float(latest.get("ROC_10", 0.0))
+
+        if signal == "BUY":
+            if close_vs_sma20 <= 0.0 or close_vs_sma50 <= 0.0:
+                signal = "HOLD"
+                filters_failed.append(
+                    f"Weak trend (SMA20 {close_vs_sma20:.2%}, SMA50 {close_vs_sma50:.2%})"
+                )
+            elif sma20_vs_sma50 <= 0.0:
+                signal = "HOLD"
+                filters_failed.append(f"Short trend not confirming (SMA20/SMA50 {sma20_vs_sma50:.2%})")
+            elif rsi < 45 or rsi > 70:
+                signal = "HOLD"
+                filters_failed.append(f"RSI not confirming ({rsi:.1f})")
+            elif roc_10 <= 0.0:
+                signal = "HOLD"
+                filters_failed.append(f"Momentum weak (ROC10 {roc_10:.2%})")
+            else:
+                filters_passed.append("Trend + momentum OK")
+        elif signal == "SELL":
+            if close_vs_sma20 >= 0.0 or close_vs_sma50 >= 0.0:
+                signal = "HOLD"
+                filters_failed.append(
+                    f"Weak downtrend (SMA20 {close_vs_sma20:.2%}, SMA50 {close_vs_sma50:.2%})"
+                )
+            elif sma20_vs_sma50 >= 0.0:
+                signal = "HOLD"
+                filters_failed.append(f"Short trend not confirming (SMA20/SMA50 {sma20_vs_sma50:.2%})")
+            elif rsi > 55 or rsi < 30:
+                signal = "HOLD"
+                filters_failed.append(f"RSI not confirming ({rsi:.1f})")
+            elif roc_10 >= 0.0:
+                signal = "HOLD"
+                filters_failed.append(f"Momentum weak (ROC10 {roc_10:.2%})")
+            else:
+                filters_passed.append("Trend + momentum OK")
+
+    return signal, f"Model probability {proba:.1%}" if proba is not None else "Technical setup", filters_passed, filters_failed
 
 
 def _get_spy_regime() -> str:
@@ -98,42 +189,18 @@ def generate_signal_for_ticker(
         reason = f"Model probability {proba:.1%}"
 
     # ---------- Layer 1 Filters ----------
-    filters_passed = []
-    filters_failed = []
-
-    if REQUIRE_SPY_TREND and signal in ("BUY", "SELL"):
-        if signal == "BUY" and spy_regime == "bear":
-            signal = "HOLD"
-            filters_failed.append("SPY in downtrend")
-        elif signal == "SELL" and spy_regime == "bull":
-            signal = "HOLD"
-            filters_failed.append("SPY in uptrend")
-        else:
-            filters_passed.append(f"SPY regime OK ({spy_regime})")
-
-    if REQUIRE_VOLUME_CONFIRM and signal in ("BUY", "SELL"):
-        vol_ratio = latest.get("Volume_Ratio", 1.0)
-        if vol_ratio < 0.85:
-            signal = "HOLD"
-            filters_failed.append(f"Low volume ({vol_ratio:.2f}x)")
-        else:
-            filters_passed.append(f"Volume OK ({vol_ratio:.2f}x)")
-
-    if REQUIRE_TREND_FILTER and signal in ("BUY", "SELL"):
-        close_vs_sma50 = latest.get("Close_vs_SMA50", 0)
-        if signal == "BUY" and close_vs_sma50 < -0.05:
-            signal = "HOLD"
-            filters_failed.append("Strong downtrend vs SMA50")
-        elif signal == "SELL" and close_vs_sma50 > 0.05:
-            signal = "HOLD"
-            filters_failed.append("Strong uptrend vs SMA50")
-        else:
-            filters_passed.append("Trend filter OK")
+    signal, base_reason, filters_passed, filters_failed = _apply_quality_filters(
+        signal,
+        proba,
+        latest,
+        spy_regime,
+        min_confidence,
+    )
 
     if filters_failed:
-        reason = f"{reason} | Filtered: {', '.join(filters_failed)}"
+        reason = f"{base_reason} | Filtered: {', '.join(filters_failed)}"
     elif filters_passed:
-        reason = f"{reason} | {', '.join(filters_passed)}"
+        reason = f"{base_reason} | {', '.join(filters_passed)}"
 
     price = get_latest_price(ticker) or float(df["Close"].iloc[-1])
 
@@ -141,7 +208,8 @@ def generate_signal_for_ticker(
     position_size_pct = None
     if atr and price and atr > 0:
         risk_per_share = 2 * atr
-        position_size_pct = round(min(0.08, 0.01 * price / risk_per_share), 4)
+        base_position = min(MAX_POSITION_PCT, 0.015 + max(0.0, abs(float(proba) - 0.5)) * 0.10)
+        position_size_pct = round(min(MAX_POSITION_PCT, max(0.01, base_position * (1.0 / max(1.0, risk_per_share / price)))), 4)
 
     return {
         "ticker": ticker,

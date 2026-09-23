@@ -161,3 +161,101 @@ def get_signal_from_proba(proba: float, min_confidence: float = 0.58) -> str:
     if proba <= (1 - min_confidence):
         return "SELL"
     return "HOLD"
+
+
+def walk_forward_validate(
+    df: pd.DataFrame,
+    n_splits: int = 3,
+    horizon: int = 5,
+    min_confidence: float = 0.6,
+    random_state: int = 42,
+) -> dict[str, Any]:
+    """Simple walk-forward validation using rolling train/test windows."""
+    if df.empty or len(df) < 180:
+        return {
+            "accuracy": 0.0,
+            "win_rate": 0.0,
+            "avg_return_pct": 0.0,
+            "n_trades": 0,
+            "message": "Not enough data for walk-forward validation",
+        }
+
+    df = add_technical_features(df.copy(), target_horizon=horizon)
+    df = df.dropna(subset=["Target"]).reset_index(drop=True)
+    if len(df) < 100:
+        return {
+            "accuracy": 0.0,
+            "win_rate": 0.0,
+            "avg_return_pct": 0.0,
+            "n_trades": 0,
+            "message": "Not enough valid samples after target construction",
+        }
+
+    X, y = prepare_ml_dataset(df)
+    n = len(X)
+    split_size = max(40, n // (n_splits + 1))
+    trades = []
+    accuracies = []
+
+    for i in range(n_splits):
+        train_end = max(split_size, n - (n_splits - i) * split_size)
+        train_end = min(train_end, n - 20)
+        if train_end <= 40:
+            break
+
+        X_train = X.iloc[:train_end]
+        y_train = y.iloc[:train_end]
+        X_test = X.iloc[train_end:]
+        y_test = y.iloc[train_end:]
+
+        if len(X_train) < 40 or len(X_test) < 10:
+            continue
+
+        model = lgb.LGBMClassifier(
+            n_estimators=150,
+            learning_rate=0.05,
+            max_depth=6,
+            num_leaves=31,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=random_state + i,
+            verbosity=-1,
+            n_jobs=-1,
+        )
+        model.fit(X_train, y_train)
+
+        proba = model.predict_proba(X_test)[:, 1]
+        pred = (proba >= min_confidence).astype(int)
+        truth = y_test.to_numpy(dtype=int)
+        accuracies.append(float(accuracy_score(truth, pred)))
+
+        for prob, actual in zip(proba, truth):
+            signal = "BUY" if prob >= min_confidence else "SELL" if prob <= (1 - min_confidence) else "HOLD"
+            if signal == "HOLD":
+                continue
+            ret = 0.05 if actual == 1 else -0.05
+            if signal == "SELL" and actual == 0:
+                ret = 0.05
+            if signal == "BUY" and actual == 0:
+                ret = -0.05
+            trades.append(ret)
+
+    if not accuracies:
+        return {
+            "accuracy": 0.0,
+            "win_rate": 0.0,
+            "avg_return_pct": 0.0,
+            "n_trades": 0,
+            "message": "No successful walk-forward splits were produced",
+        }
+
+    win_rate = (sum(1 for t in trades if t > 0) / len(trades)) * 100 if trades else 0.0
+    avg_return = (sum(trades) / len(trades)) * 100 if trades else 0.0
+
+    return {
+        "accuracy": float(np.mean(accuracies)),
+        "win_rate": float(win_rate),
+        "avg_return_pct": float(avg_return),
+        "n_trades": int(len(trades)),
+        "message": "walk-forward validation complete",
+    }

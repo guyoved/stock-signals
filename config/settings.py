@@ -74,15 +74,17 @@ DEFAULT_WATCHLIST = [
 
 # Signal settings
 LOOKBACK_DAYS = 365 * 2
-MIN_CONFIDENCE = 0.53
+MIN_CONFIDENCE = 0.60
 SIGNAL_COOLDOWN_HOURS = 24
 SIGNAL_HORIZON_DAYS = 5
 
 # ----- Layer 1 filters -----
-MAX_SIGNALS_PER_RUN = 5          # only keep the strongest N signals
+MAX_SIGNALS_PER_RUN = 3          # only keep the strongest N signals
 REQUIRE_SPY_TREND = True         # block BUY in bear / SELL in bull
 REQUIRE_VOLUME_CONFIRM = True    # require volume >= average
 REQUIRE_TREND_FILTER = True      # basic trend alignment
+VOLUME_CONFIRM_RATIO = 1.00
+TREND_CONFIRM_MARGIN = 0.03
 
 # Risk defaults (paper)
 MAX_POSITION_PCT = 0.05
